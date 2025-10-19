@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dummy UPI App</title>
+</head>
+<body>
+<h2>Signup</h2>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<input id="upi" placeholder="UPI ID">
+<button onclick="signup()">Sign Up</button>
+
+<h2>Login</h2>
+<input id="loginUsername" placeholder="Username">
+<input id="loginPassword" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+
+<h2>Send Money</h2>
+<input id="sender" placeholder="Sender UPI">
+<input id="receiver" placeholder="Receiver UPI">
+<input id="amount" placeholder="Amount">
+<button onclick="sendMoney()">Send</button>
+
+<h2>Balance</h2>
+<input id="checkUpi" placeholder="UPI ID">
+<button onclick="getBalance()">Check Balance</button>
+
+<script src="script.js"></script>
+</body>
+</html>

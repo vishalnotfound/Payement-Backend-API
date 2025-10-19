@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Stock Tracker</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for creating charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons for UI elements -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for a better look in dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a202c; /* Equivalent to dark gray bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568; /* Equivalent to gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* Equivalent to gray-500 */
+        }
+        /* Style for the chart modal backdrop */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.75);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans antialiased">
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 md:p-6 max-w-7xl">
+
+        <!-- Header Section -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8">
+            <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <i data-lucide="trending-up" class="w-6 h-6"></i>
+                </div>
+                <h1 class="text-3xl font-bold tracking-tight">Stock Tracker</h1>
+            </div>
+            <!-- Search Bar -->
+            <div class="w-full md:w-1/3">
+                <div class="relative">
+                    <input type="search" id="search-input" placeholder="Search stocks (e.g., RELIANCE)" class="w-full bg-gray-800 text-white rounded-full py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- API Key Notice -->
+        <div id="api-notice" class="bg-yellow-900/50 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg relative mb-6" role="alert">
+            <strong class="font-bold">Important:</strong>
+            <span class="block sm:inline">Please add your free Finnhub.io API key in the JavaScript code to fetch live data.</span>
+        </div>
+
+        <main>
+            <!-- Market Indices Section -->
+            <section id="indices-section" class="mb-8">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-300">Market Indices</h2>
+                <div id="indices-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Placeholder for index cards -->
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                </div>
+            </section>
+
+            <!-- Search Results or Watchlist Section -->
+            <section id="stocks-section">
+                <h2 id="stocks-title" class="text-2xl font-semibold mb-4 text-gray-300">Watchlist</h2>
+                <div id="stocks-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Placeholder for stock cards -->
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                    <div class="loader-card bg-gray-800 p-4 rounded-lg animate-pulse h-24"></div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <!-- Chart Modal -->
+    <div id="chart-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+        <div class="bg-gray-800 rounded-2xl shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <div>
+                    <h3 id="chart-title" class="text-xl font-bold">Stock Chart</h3>
+                    <p id="chart-subtitle" class="text-sm text-gray-400"></p>
+                </div>
+                <button id="close-modal-btn" class="p-2 rounded-full hover:bg-gray-700 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-4 flex-grow overflow-hidden">
+                <canvas id="stock-chart" class="w-full h-full"></canvas>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        // IMPORTANT: Replace with your free API key from https://finnhub.io/
+        const API_KEY = 'd3prk9pr01qgab520ci0d3prk9pr01qgab520cig';
+
+        // --- DOM ELEMENTS ---
+        const searchInput = document.getElementById('search-input');
+        const indicesContainer = document.getElementById('indices-container');
+        const stocksContainer = document.getElementById('stocks-container');
+        const stocksTitle = document.getElementById('stocks-title');
+        const apiNotice = document.getElementById('api-notice');
+        
+        // Modal elements
+        const chartModal = document.getElementById('chart-modal');
+        const chartTitle = document.getElementById('chart-title');
+        const chartSubtitle = document.getElementById('chart-subtitle');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const chartCanvas = document.getElementById('stock-chart');
+        let stockChartInstance = null;
+        
+        // --- INITIAL DATA ---
+        const defaultWatchlist = [
+            'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 
+            'ICICIBANK.NS', 'HINDUNILVR.NS', 'ITC.NS', 'BHARTIARTL.NS'
+        ];
+        const indices = [
+            { symbol: '^NSEI', name: 'NIFTY 50' },
+            { symbol: '^BSESN', name: 'SENSEX' }
+        ];
+
+        // --- API FUNCTIONS ---
+        const finnhubAPI = {
+            BASE_URL: 'https://finnhub.io/api/v1',
+            
+            // Generic fetch function with error handling
+            async request(endpoint) {
+                if (API_KEY === 'YOUR_FINNHUB_API_KEY') {
+                    console.error("API Key not set. Please get a free key from finnhub.io");
+                    apiNotice.style.display = 'block';
+                    return null;
+                }
+                apiNotice.style.display = 'none';
+
+                const url = `${this.BASE_URL}/${endpoint}&token=${API_KEY}`;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('API Error:', error);
+                    return null;
+                }
+            },
+
+            // Fetch current price and change
+            getQuote(symbol) {
+                return this.request(`quote?symbol=${symbol}`);
+            },
+            
+            // Search for stocks
+            searchSymbols(query) {
+                return this.request(`search?q=${query}`);
+            },
+
+            // Fetch historical data for charts
+            getHistory(symbol) {
+                const to = Math.floor(Date.now() / 1000);
+                const from = to - (365 * 24 * 60 * 60); // 1 year ago
+                return this.request(`stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}`);
+            }
+        };
+
+        // --- RENDERING FUNCTIONS ---
+        
+        // Function to format numbers
+        const formatNumber = (num) => num ? num.toFixed(2) : '0.00';
+
+        // Render a card for an index
+        const renderIndexCard = (data) => {
+            const change = data.d || 0;
+            const percentChange = data.dp || 0;
+            const colorClass = change >= 0 ? 'text-green-500' : 'text-red-500';
+            const sign = change >= 0 ? '+' : '';
+
+            return `
+                <div class="bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-md">
+                    <h3 class="text-lg font-bold text-gray-300">${data.name}</h3>
+                    <div class="flex justify-between items-baseline mt-2">
+                        <p class="text-2xl font-semibold">${formatNumber(data.c)}</p>
+                        <p class="${colorClass} font-medium">${sign}${formatNumber(change)} (${formatNumber(percentChange)}%)</p>
+                    </div>
+                </div>
+            `;
+        };
+
+        // Render a card for a stock in the watchlist or search results
+        const renderStockCard = (data) => {
+            const change = data.quote.d || 0;
+            const percentChange = data.quote.dp || 0;
+            const colorClass = change >= 0 ? 'text-green-500' : 'text-red-500';
+            const sign = change >= 0 ? '+' : '';
+
+            return `
+                <div class="stock-card bg-gray-800 p-4 rounded-lg border border-gray-700 shadow-md cursor-pointer hover:bg-gray-700/50 hover:border-blue-500 transition duration-300" data-symbol="${data.profile.ticker}" data-name="${data.profile.name}">
+                    <h4 class="font-bold truncate" title="${data.profile.name}">${data.profile.name || data.profile.ticker}</h4>
+                    <p class="text-sm text-gray-400">${data.profile.ticker}</p>
+                    <div class="flex justify-between items-baseline mt-2">
+                        <p class="text-xl font-semibold">${formatNumber(data.quote.c)}</p>
+                        <p class="${colorClass} font-medium">${sign}${formatNumber(change)} (${formatNumber(percentChange)}%)</p>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // --- DATA FETCHING & DISPLAY LOGIC ---
+        
+        // Load data for the main indices
+        const loadIndices = async () => {
+            indicesContainer.innerHTML = ''; // Clear placeholders
+            for (const index of indices) {
+                const quote = await finnhubAPI.getQuote(index.symbol);
+                if (quote && quote.c !== 0) { // Check for valid data
+                    indicesContainer.innerHTML += renderIndexCard({ ...quote, name: index.name });
+                }
+            }
+        };
+
+        // Load data for the watchlist
+        const loadWatchlist = async () => {
+            stocksContainer.innerHTML = ''; // Clear placeholders
+            for (const symbol of defaultWatchlist) {
+                const quote = await finnhubAPI.getQuote(symbol);
+                // For stocks, we also need the company name which is not in the quote endpoint.
+                // For simplicity, we will use the symbol as a fallback for the name.
+                // A better approach would be to call the /stock/profile2 endpoint.
+                if (quote && quote.c !== 0) {
+                    stocksContainer.innerHTML += renderStockCard({
+                        profile: { ticker: symbol, name: symbol.split('.')[0] },
+                        quote: quote
+                    });
+                }
+            }
+        };
+
+        // Perform a search and display results
+        const handleSearch = async (query) => {
+            if (query.trim() === '') {
+                stocksTitle.textContent = 'Watchlist';
+                loadWatchlist();
+                return;
+            }
+
+            stocksTitle.textContent = `Search Results for "${query}"`;
+            stocksContainer.innerHTML = '<div class="col-span-full text-center p-8 text-gray-400">Searching...</div>';
+            
+            const searchResults = await finnhubAPI.searchSymbols(query);
+            
+            if (searchResults && searchResults.result) {
+                // Filter for Indian stocks (NSE/BSE)
+                const indianStocks = searchResults.result.filter(stock => 
+                    stock.symbol.endsWith('.NS') || stock.symbol.endsWith('.BO')
+                );
+
+                if (indianStocks.length === 0) {
+                    stocksContainer.innerHTML = '<div class="col-span-full text-center p-8 text-gray-400">No Indian stocks found.</div>';
+                    return;
+                }
+                
+                stocksContainer.innerHTML = '';
+                // Fetch quotes for the top few results for live prices
+                for (const stock of indianStocks.slice(0, 12)) { // Limit to 12 results to avoid too many API calls
+                    const quote = await finnhubAPI.getQuote(stock.symbol);
+                    if (quote && quote.c !== 0) {
+                        stocksContainer.innerHTML += renderStockCard({
+                            profile: { ticker: stock.symbol, name: stock.description },
+                            quote: quote
+                        });
+                    }
+                }
+            } else {
+                stocksContainer.innerHTML = '<div class="col-span-full text-center p-8 text-gray-400">Could not fetch search results.</div>';
+            }
+        };
+
+        // --- CHART LOGIC ---
+        const displayChart = (history, symbol, name) => {
+            chartTitle.textContent = name;
+            chartSubtitle.textContent = symbol;
+            
+            if (stockChartInstance) {
+                stockChartInstance.destroy();
+            }
+
+            const timestamps = history.t.map(ts => new Date(ts * 1000));
+            const prices = history.c;
+
+            stockChartInstance = new Chart(chartCanvas, {
+                type: 'line',
+                data: {
+                    labels: timestamps,
+                    datasets: [{
+                        label: 'Price (INR)',
+                        data: prices,
+                        borderColor: '#3b82f6', // blue-500
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.1,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'month',
+                                tooltipFormat: 'll'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#9ca3af' // gray-400
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#9ca3af', // gray-400
+                                callback: function(value, index, values) {
+                                    return '₹' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    }
+                }
+            });
+
+            chartModal.classList.remove('hidden');
+        };
+
+        const showStockChart = async (symbol, name) => {
+            const history = await finnhubAPI.getHistory(symbol);
+            if (history && history.s === 'ok') {
+                displayChart(history, symbol, name);
+            } else {
+                alert('Could not fetch historical data for this stock.');
+            }
+        };
+
+        // --- EVENT LISTENERS ---
+
+        // Debounce search input to prevent API calls on every keystroke
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                handleSearch(e.target.value);
+            }, 500); // 500ms delay
+        });
+
+        // Open chart modal when a stock card is clicked
+        stocksContainer.addEventListener('click', (e) => {
+            const card = e.target.closest('.stock-card');
+            if (card) {
+                const symbol = card.dataset.symbol;
+                const name = card.dataset.name;
+                showStockChart(symbol, name);
+            }
+        });
+        
+        // Close chart modal
+        closeModalBtn.addEventListener('click', () => chartModal.classList.add('hidden'));
+        chartModal.addEventListener('click', (e) => {
+            if (e.target === chartModal) {
+                 chartModal.classList.add('hidden');
+            }
+        });
+
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Lucide icons
+            lucide.createIcons();
+
+            // Load initial data
+            loadIndices();
+            loadWatchlist();
+        });
+
+    </script>
+</body>
+</html>
+
