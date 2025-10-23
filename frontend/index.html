@@ -1,32 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dummy UPI App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayFast - UPI Payment App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-<h2>Signup</h2>
-<input id="username" placeholder="Username">
-<input id="password" type="password" placeholder="Password">
-<input id="upi" placeholder="UPI ID">
-<button onclick="signup()">Sign Up</button>
+    <div class="app-container">
+        <!-- Auth Section -->
+        <div id="auth-section" class="section">
+            <div class="auth-container">
+                <div class="logo">
+                    <span class="material-icons">payments</span>
+                    <h1>PayFast</h1>
+                </div>
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="login">Login</button>
+                    <button class="tab-btn" data-tab="signup">Sign Up</button>
+                </div>
+                
+                <form id="login-form" class="auth-form">
+                    <h2>Welcome Back</h2>
+                    <div class="input-group">
+                        <span class="material-icons">account_circle</span>
+                        <input type="text" id="login-username" placeholder="UPI ID (e.g. name@bank)" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="material-icons">lock</span>
+                        <input type="password" id="login-password" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
 
-<h2>Login</h2>
-<input id="loginUsername" placeholder="Username">
-<input id="loginPassword" type="password" placeholder="Password">
-<button onclick="login()">Login</button>
+                <form id="signup-form" class="auth-form hidden">
+                    <h2>Create Account</h2>
+                    <div class="input-group">
+                        <span class="material-icons">person</span>
+                        <input type="text" id="signup-name" placeholder="Full Name" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="material-icons">account_balance</span>
+                        <input type="text" id="signup-upi" placeholder="UPI ID (e.g. name@bank)" required>
+                    </div>
+                    <div class="input-group">
+                        <span class="material-icons">lock</span>
+                        <input type="password" id="signup-password" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Sign Up</button>
+                </form>
+            </div>
+        </div>
 
-<h2>Send Money</h2>
-<input id="sender" placeholder="Sender UPI">
-<input id="receiver" placeholder="Receiver UPI">
-<input id="amount" placeholder="Amount">
-<button onclick="sendMoney()">Send</button>
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="section hidden">
+            <nav class="dashboard-nav">
+                <div class="logo">
+                    <span class="material-icons">payments</span>
+                    <h1>PayFast</h1>
+                </div>
+                <button id="logout" class="btn-secondary">
+                    <span class="material-icons">logout</span>
+                    Logout
+                </button>
+            </nav>
 
-<h2>Balance</h2>
-<input id="checkUpi" placeholder="UPI ID">
-<button onclick="getBalance()">Check Balance</button>
+            <div class="dashboard-container">
+                <div class="balance-card">
+                    <div class="balance-header">
+                        <h3>Available Balance</h3>
+                        <button id="refresh-balance" class="btn-icon">
+                            <span class="material-icons">refresh</span>
+                        </button>
+                    </div>
+                    <h2 id="balance-amount">₹0.00</h2>
+                </div>
 
-<script src="script.js"></script>
+                <div class="actions-grid">
+                    <div class="action-card">
+                        <h3>Send Money</h3>
+                        <form id="send-form">
+                            <div class="input-group">
+                                <span class="material-icons">person</span>
+                                <input type="text" id="to-upi" placeholder="Recipient UPI ID" required>
+                            </div>
+                            <div class="input-group">
+                                <span class="material-icons">currency_rupee</span>
+                                <input type="number" id="amount" placeholder="Amount" min="1" step="0.01" required>
+                            </div>
+                            <button type="submit" class="btn-primary">Send Money</button>
+                        </form>
+                    </div>
+
+                    <div class="action-card">
+                        <h3>Recent Transactions</h3>
+                        <div id="transactions-list" class="transactions">
+                            <!-- Transactions will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Messages -->
+        <div id="toast" class="toast hidden"></div>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>

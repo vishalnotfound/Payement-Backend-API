@@ -1,31 +1,28 @@
+# backend/schemas.py
 from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional
 
-# Request models
 class UserCreate(BaseModel):
     name: str
     upi_id: str
     password: str
-    balance: float = 0.0
+    balance: Optional[float] = 1000.0
 
-class LoginRequest(BaseModel):
-    upi_id: str
-    password: str
-
-class SendMoney(BaseModel):
-    to_upi: str
-    amount: float
-
-# Response models
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-class BalanceResponse(BaseModel):
+class SendRequest(BaseModel):
+    to_upi: str
+    amount: float
+
+class BalanceOut(BaseModel):
     upi_id: str
     balance: float
 
 class TransactionOut(BaseModel):
-    from_upi: str
-    to_upi: str
+    sender_upi: str
+    receiver_upi: str
     amount: float
-    created_at: str | None = None
+    created_at: datetime

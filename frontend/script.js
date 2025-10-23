@@ -1,142 +1,191 @@
-const API_BASE = 'http://127.0.0.1:8000';
+const API_URL = 'http://127.0.0.1:8000';
+let token = localStorage.getItem('token');
 
-function showMessage(msg, isError = false) {
-    console[isError ? 'error' : 'log'](msg);
-    const el = document.getElementById('message');
-    if (el) {
-        el.textContent = msg;
-        el.style.color = isError ? 'red' : 'green';
+// UI Helper Functions
+function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.remove('hidden', 'success', 'error');
+    toast.classList.add(isError ? 'error' : 'success');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function updateUI(isLoggedIn) {
+    document.getElementById('auth-section').classList.toggle('hidden', isLoggedIn);
+    document.getElementById('dashboard-section').classList.toggle('hidden', !isLoggedIn);
+    if (isLoggedIn) {
+        checkBalance();
+        loadTransactions();
     }
 }
 
-function getAuthHeaders() {
-    const token = localStorage.getItem('authToken');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return headers;
-}
-
-async function handleResponse(res) {
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { /* not JSON */ }
-    if (!res.ok) {
-        const body = text || res.statusText;
-        throw { status: res.status, body, parsed: data };
-    }
-    return data;
-}
-
+// Auth Functions
 async function signup(event) {
-    if (event) event.preventDefault();
-    const username = (document.getElementById('signup-username') || {}).value || (document.getElementById('username') || {}).value;
-    const password = (document.getElementById('signup-password') || {}).value || (document.getElementById('password') || {}).value;
-    if (!username || !password) { showMessage('Username and password required', true); return; }
+    event.preventDefault();
+    const name = document.getElementById('signup-name').value;
+    const upi_id = document.getElementById('signup-upi').value;
+    const password = document.getElementById('signup-password').value;
 
     try {
-        const res = await fetch(`${API_BASE}/signup`, {
+        const res = await fetch(`${API_URL}/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ name, upi_id, password })
         });
-        const data = await handleResponse(res);
-        showMessage('Signup successful');
-        if (data && data.access_token) localStorage.setItem('authToken', data.access_token);
-        console.log('signup response', data);
+
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Account created successfully! Please login.');
+            document.querySelector('[data-tab="login"]').click();
+            event.target.reset();
+        } else {
+            throw new Error(data.detail || 'Signup failed');
+        }
     } catch (err) {
-        showMessage(`Signup failed (${err.status || 'network'}): ${err.body || err}`, true);
-        console.error('Signup error detail:', err);
+        showToast(err.message, true);
     }
 }
 
 async function login(event) {
-    if (event) event.preventDefault();
-    const username = (document.getElementById('login-username') || {}).value || (document.getElementById('username') || {}).value;
-    const password = (document.getElementById('login-password') || {}).value || (document.getElementById('password') || {}).value;
-    if (!username || !password) { showMessage('Username and password required', true); return; }
+    event.preventDefault();
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
 
     try {
-        const res = await fetch(`${API_BASE}/login`, {
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        const res = await fetch(`${API_URL}/token`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: formData
         });
-        const data = await handleResponse(res);
-        showMessage('Login successful');
-        if (data && data.access_token) localStorage.setItem('authToken', data.access_token);
-        else if (data && data.token) localStorage.setItem('authToken', data.token);
-        console.log('login response', data);
-    } catch (err) {
-        showMessage(`Login failed (${err.status || 'network'}): ${err.body || err}`, true);
-        console.error('Login error detail:', err);
-    }
-}
 
-async function sendMoney(event) {
-    if (event) event.preventDefault();
-    const to = (document.getElementById('to') || {}).value;
-    const amount = parseFloat((document.getElementById('amount') || {}).value);
-    if (!to || !amount) { showMessage('Recipient and amount required', true); return; }
-
-    try {
-        const res = await fetch(`${API_BASE}/send`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ to, amount })
-        });
-        const data = await handleResponse(res);
-        showMessage('Payment sent');
-        console.log('send response', data);
-    } catch (err) {
-        showMessage(`Send failed (${err.status || 'network'}): ${err.body || err}`, true);
-        console.error('Send error detail:', err);
-    }
-}
-
-async function checkBalance(event) {
-    if (event) event.preventDefault();
-    const username = (document.getElementById('balance-username') || {}).value || localStorage.getItem('username');
-    try {
-        // try GET first, fallback to POST if server expects body
-        let res = await fetch(`${API_BASE}/balance${username ? '?username=' + encodeURIComponent(username) : ''}`, {
-            method: 'GET',
-            headers: getAuthHeaders()
-        });
-        if (res.status === 405 || res.status === 400) {
-            res = await fetch(`${API_BASE}/balance`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ username })
-            });
+        const data = await res.json();
+        if (res.ok) {
+            token = data.access_token;
+            localStorage.setItem('token', token);
+            showToast('Login successful');
+            updateUI(true);
+        } else {
+            throw new Error(data.detail || 'Login failed');
         }
-        const data = await handleResponse(res);
-        showMessage('Balance: ' + (data?.balance ?? JSON.stringify(data)));
-        console.log('balance response', data);
     } catch (err) {
-        showMessage(`Balance check failed (${err.status || 'network'}): ${err.body || err}`, true);
-        console.error('Balance error detail:', err);
+        showToast(err.message, true);
     }
 }
 
 function logout() {
-    localStorage.removeItem('authToken');
-    showMessage('Logged out');
+    localStorage.removeItem('token');
+    token = null;
+    updateUI(false);
+    showToast('Logged out successfully');
 }
 
-// attach to DOM if elements exist
+// Transaction Functions
+async function sendMoney(event) {
+    event.preventDefault();
+    const to_upi = document.getElementById('to-upi').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+
+    try {
+        const res = await fetch(`${API_URL}/me/send`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ to_upi, amount })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            showToast(data.message);
+            checkBalance();
+            loadTransactions();
+            event.target.reset();
+        } else {
+            throw new Error(data.detail || 'Transfer failed');
+        }
+    } catch (err) {
+        showToast(err.message, true);
+    }
+}
+
+async function checkBalance() {
+    try {
+        const res = await fetch(`${API_URL}/me/balance`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+            document.getElementById('balance-amount').textContent = 
+                new Intl.NumberFormat('en-IN', { 
+                    style: 'currency', 
+                    currency: 'INR' 
+                }).format(data.balance);
+        } else {
+            throw new Error(data.detail || 'Could not fetch balance');
+        }
+    } catch (err) {
+        showToast(err.message, true);
+    }
+}
+
+async function loadTransactions() {
+    try {
+        const res = await fetch(`${API_URL}/me/transactions`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const transactions = await res.json();
+        
+        const list = document.getElementById('transactions-list');
+        list.innerHTML = transactions.length ? '' : '<p>No transactions yet</p>';
+        
+        transactions.forEach(tx => {
+            const item = document.createElement('div');
+            item.className = 'transaction-item';
+            item.innerHTML = `
+                <div>
+                    <strong>${tx.sender_upi === tx.receiver_upi ? 'Self Transfer' : 
+                        tx.sender_upi}</strong> →
+                    <strong>${tx.receiver_upi}</strong>
+                </div>
+                <div>
+                    <strong>₹${tx.amount}</strong>
+                    <div class="text-secondary">${new Date(tx.created_at).toLocaleDateString()}</div>
+                </div>
+            `;
+            list.appendChild(item);
+        });
+    } catch (err) {
+        showToast('Could not load transactions', true);
+    }
+}
+
+// Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    const sForm = document.getElementById('signup-form') || document.getElementById('signup');
-    if (sForm) sForm.addEventListener('submit', signup);
+    // Auth tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            document.querySelectorAll('.auth-form').forEach(form => {
+                form.classList.toggle('hidden', form.id !== `${btn.dataset.tab}-form`);
+            });
+        });
+    });
 
-    const lForm = document.getElementById('login-form') || document.getElementById('login');
-    if (lForm) lForm.addEventListener('submit', login);
+    // Form submissions
+    document.getElementById('signup-form').addEventListener('submit', signup);
+    document.getElementById('login-form').addEventListener('submit', login);
+    document.getElementById('send-form').addEventListener('submit', sendMoney);
+    
+    // Other actions
+    document.getElementById('refresh-balance').addEventListener('click', checkBalance);
+    document.getElementById('logout').addEventListener('click', logout);
 
-    const sendForm = document.getElementById('send-form') || document.getElementById('send');
-    if (sendForm) sendForm.addEventListener('submit', sendMoney);
-
-    const balanceBtn = document.getElementById('check-balance') || document.getElementById('balance-btn');
-    if (balanceBtn) balanceBtn.addEventListener('click', checkBalance);
-
-    const logoutBtn = document.getElementById('logout');
-    if (logoutBtn) logoutBtn.addEventListener('click', logout);
+    // Check if already logged in
+    updateUI(!!token);
 });
