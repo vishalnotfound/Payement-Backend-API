@@ -1,6 +1,5 @@
 const API_URL = 'http://127.0.0.1:8000';
-let token = localStorage.getItem('token');
-
+let token = localStorage.getItem('token')
 
 function showToast(message, isError = false) {
     const toast = document.getElementById('toast');
